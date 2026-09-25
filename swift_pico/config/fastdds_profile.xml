@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Fast-DDS transport profile for the swift_pico simulation graph.
+
+  /image_raw is ~4.7MB per frame (1280x1280 rgb8) at up to 40Hz. Fast-DDS's
+  default shared-memory segment (~512KB) is smaller than that, so large
+  image messages silently fall back to UDPv4 -- and the stock Linux kernel
+  UDP receive buffer (~208KB, net.core.rmem_max) is far too small to carry
+  that traffic reliably, causing dropped fragments, RELIABLE-QoS
+  retransmits, and bursty/stalled delivery. This profile raises the SHM
+  segment well above the image size so same-host publishers/subscribers
+  (the bridge <-> whycode_node) use shared memory instead of UDP for the
+  image topics, without requiring any client-side kernel/sysctl changes.
+  UDPv4 is kept as a fallback transport for discovery and for any process
+  in the graph that doesn't load this profile.
+
+  Applied via the FASTRTPS_DEFAULT_PROFILES_FILE env var in
+  swift_pico_simulation.launch.py -- do not rely on this being picked up
+  automatically outside that launch file.
+-->
+<dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+    <profiles>
+        <transport_descriptors>
+            <transport_descriptor>
+                <transport_id>shm_transport</transport_id>
+                <type>SHM</type>
+                <!-- 64MiB. Must comfortably exceed one frame (4.7MB at
+                     1280x1280 rgb8) with room for several in flight, and there
+                     are two such topics in the graph: /image_raw from the
+                     bridge and /whycode_node/image_out from whycode. A segment
+                     too small for the payload drops the topic back to UDPv4,
+                     which is the exact failure this profile exists to prevent.
+                     Revisit if CAM_W/CAM_H in mujoco_bridge.cpp change. -->
+                <segment_size>67108864</segment_size>
+            </transport_descriptor>
+            <transport_descriptor>
+                <transport_id>udp_transport</transport_id>
+                <type>UDPv4</type>
+            </transport_descriptor>
+        </transport_descriptors>
+
+        <participant profile_name="swift_pico_profile" is_default_profile="true">
+            <rtps>
+                <userTransports>
+                    <transport_id>shm_transport</transport_id>
+                    <transport_id>udp_transport</transport_id>
+                </userTransports>
+                <useBuiltinTransports>false</useBuiltinTransports>
+            </rtps>
+        </participant>
+    </profiles>
+</dds>

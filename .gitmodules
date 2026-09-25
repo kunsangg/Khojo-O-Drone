@@ -1,7 +1,3 @@
-[submodule "controller_tuner"]
-	path = controller_tuner
-	url = https://github.com/erts-RnD/controller_tuner.git
-	branch = ros2
 [submodule "mav_comm"]
 	path = mav_comm
 	url = https://github.com/arunser/mav_comm.git
